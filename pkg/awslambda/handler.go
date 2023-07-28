@@ -86,6 +86,7 @@ func HandleLambdaEvent(event interface{}) error {
 		}
 	}
 
+	log.Debug().Msgf("nothing to do; recordset %v does not belong to my region %s", matchedRs, myRegion)
 	return nil
 }
 

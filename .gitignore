@@ -1,0 +1,5 @@
+.DS_Store
+aws-global-elasticache-promoter
+main
+.vscode
+dist

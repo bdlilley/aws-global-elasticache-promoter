@@ -84,6 +84,7 @@ func HandleLambdaEvent(event interface{}) error {
 		if err = checkRedis(ctx); err != nil {
 			return err
 		}
+		return nil
 	}
 
 	log.Debug().Msgf("nothing to do; recordset %v does not belong to my region %s", matchedRs, myRegion)

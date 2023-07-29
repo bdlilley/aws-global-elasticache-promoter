@@ -58,16 +58,9 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	// Z10116174WM8F5NP9R1Z
 	rootCmd.PersistentFlags().StringVar(&cfg.HostedZoneID, "hz", "", "hosted zone id")
 	rootCmd.PersistentFlags().StringVarP(&cfg.DnsName, "dns-name", "d", "", "dns name to watch for changes")
 	rootCmd.PersistentFlags().StringVarP(&cfg.GlobalDataStoreId, "global-data-store-id", "g", "", "id of the elasticache global data store")
-	// rootCmd.Flags().StringArrayVarP(&config.Scopes, "scopes", "s", []string{}, "add jwt scopes")
-	// rootCmd.Flags().StringArrayVarP(&config.Audiences, "audiences", "a", []string{"https://fake-resource.solo.io"}, "jwt audience")
-	// rootCmd.Flags().StringVarP(&config.Exp, "expires-in", "e", "8766h", "expires duration (uses https://pkg.go.dev/time#ParseDuration)")
-	// rootCmd.Flags().StringVarP(&config.Sub, "subject", "u", "glooey@solo.io", "jwt subject")
-	// rootCmd.Flags().BoolVarP(&config.OutputJSON, "json", "j", false, "output full token signed details as JSON")
-	// rootCmd.Flags().StringVarP(&config.Provider, "provider", "p", "provider1", "provider to use (provider1, provider2)")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Whoops. There was an error while executing your CLI '%s'", err)

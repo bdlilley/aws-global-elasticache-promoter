@@ -89,21 +89,59 @@ func HandleLambdaEvent(event interface{}) error {
 	}
 
 	log.Debug().Msgf("nothing to do; recordset %v does not belong to my region %s", matchedRs, myRegion)
+
+	// clear the cached RG members when our region is not the active region; this way if we become active again
+	// it will force refresh of the RG member list; this enables multiple failovers to occur between regions without
+	// restarting the lambda
+	currentPrimaryMember = nil
+	currentSecondaryMember = nil
 	return nil
 }
 
 func checkRedis(ctx context.Context) error {
+	if currentPrimaryMember == nil || currentSecondaryMember == nil {
+		if err := setRSMembers(ctx); err != nil {
+			return err
+		}
+	}
+
 	if strings.EqualFold(myRegion, *currentPrimaryMember.ReplicationGroupRegion) {
 		log.Debug().Msgf("no action required, current primary member %s matches my region %s", *currentPrimaryMember.ReplicationGroupId, myRegion)
 		return nil
 	}
 
 	log.Debug().Msgf("promotion required; dns name %s resolves to my region %s, but current primary member %s does not belong to this region", cfg.DnsName, myRegion, *currentPrimaryMember.ReplicationGroupId)
+
+	// once we know promotion is required, whether there is an error or success in promotion
+	// we want the RG members to be nil; the RG members taking 1-2 minutes to update; if they
+	// aren't updated yet the next time this lambda is invoked, we want them to get refreshed
+	defer func() {
+		currentPrimaryMember = nil
+		currentSecondaryMember = nil
+	}()
+
+	// before we attempt promotion, lets make sure the RG isn't being updated already from a previous promotion
+	result, err := client.Elasticache().DescribeGlobalReplicationGroups(ctx, &elasticache.DescribeGlobalReplicationGroupsInput{
+		GlobalReplicationGroupId: &cfg.GlobalDataStoreId,
+	})
+	if err != nil {
+		return err
+	}
+	if len(result.GlobalReplicationGroups) == 0 {
+		log.Debug().Msgf("GlobalReplicationGroupId %s not found while attemping to get curent status for promotion", cfg.GlobalDataStoreId)
+		return nil
+	}
+
+	if !strings.EqualFold(*result.GlobalReplicationGroups[0].Status, "Available") {
+		log.Debug().Msgf("GlobalReplicationGroupId %s is not available yet; skipping promotion", cfg.GlobalDataStoreId)
+		return nil
+	}
+
 	curPriDump := spew.Sdump(*currentPrimaryMember)
 	curSecDump := spew.Sdump(*currentSecondaryMember)
 	log.Debug().Msgf("current primary is %s", curPriDump)
 	log.Debug().Msgf("current secondary is %s", curSecDump)
-	_, err := client.Elasticache().FailoverGlobalReplicationGroup(ctx, &elasticache.FailoverGlobalReplicationGroupInput{
+	_, err = client.Elasticache().FailoverGlobalReplicationGroup(ctx, &elasticache.FailoverGlobalReplicationGroupInput{
 		GlobalReplicationGroupId:  &cfg.GlobalDataStoreId,
 		PrimaryRegion:             currentSecondaryMember.ReplicationGroupRegion,
 		PrimaryReplicationGroupId: currentSecondaryMember.ReplicationGroupId,
@@ -112,9 +150,7 @@ func checkRedis(ctx context.Context) error {
 		return err
 	}
 	log.Debug().Msgf("member %s promoted to primary in region %s", *currentSecondaryMember.ReplicationGroupId, *currentSecondaryMember.ReplicationGroupRegion)
-
-	// update the members now that swap has occured
-	return setRSMembers(ctx)
+	return nil
 }
 
 func setRSMembers(ctx context.Context) error {

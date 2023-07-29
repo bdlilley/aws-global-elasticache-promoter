@@ -17,6 +17,7 @@ import (
 	"github.com/bensolo-io/aws-global-elasticache-promoter/pkg/awsclient"
 	"github.com/bensolo-io/aws-global-elasticache-promoter/pkg/config"
 	"github.com/bensolo-io/aws-global-elasticache-promoter/pkg/dns"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rotisserie/eris"
 	"github.com/rs/zerolog/log"
 )
@@ -98,6 +99,10 @@ func checkRedis(ctx context.Context) error {
 	}
 
 	log.Debug().Msgf("promotion required; dns name %s resolves to my region %s, but current primary member %s does not belong to this region", cfg.DnsName, myRegion, *currentPrimaryMember.ReplicationGroupId)
+	curPriDump := spew.Sdump(*currentPrimaryMember)
+	curSecDump := spew.Sdump(*currentSecondaryMember)
+	log.Debug().Msgf("current primary is %s", curPriDump)
+	log.Debug().Msgf("current secondary is %s", curSecDump)
 	_, err := client.Elasticache().FailoverGlobalReplicationGroup(ctx, &elasticache.FailoverGlobalReplicationGroupInput{
 		GlobalReplicationGroupId:  &cfg.GlobalDataStoreId,
 		PrimaryRegion:             currentSecondaryMember.ReplicationGroupRegion,
@@ -129,14 +134,14 @@ func setRSMembers(ctx context.Context) error {
 
 	currentPrimaryMember = nil
 	currentSecondaryMember = nil
-	for _, member := range grg.Members {
-		if strings.EqualFold(*member.Role, "PRIMARY") {
-			currentPrimaryMember = &member
+	for i := range grg.Members {
+		if strings.EqualFold(*grg.Members[i].Role, "PRIMARY") {
+			currentPrimaryMember = &grg.Members[i]
 		}
-		if strings.EqualFold(*member.Role, "SECONDARY") {
-			currentSecondaryMember = &member
+		if strings.EqualFold(*grg.Members[i].Role, "SECONDARY") {
+			currentSecondaryMember = &grg.Members[i]
 		}
-		log.Debug().Msgf("added rg member %s %s %s", *member.ReplicationGroupId, *member.ReplicationGroupRegion, *member.Role)
+		log.Debug().Msgf("added rg member %s %s %s", *grg.Members[i].ReplicationGroupId, *grg.Members[i].ReplicationGroupRegion, *grg.Members[i].Role)
 	}
 
 	if currentPrimaryMember == nil || currentSecondaryMember == nil {

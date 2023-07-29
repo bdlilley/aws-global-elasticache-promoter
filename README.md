@@ -1,14 +1,14 @@
 # aws-global-elasticache-promoter
 
-Manages promotion of Global Elasticache datastores from secondary to primary based on route53 failover recordset status.  This lambda is intended to be run on a CloudWatch event.
+Manages promotion of Global Elasticache datastores from secondary to primary based on route53 failover recordset status.  
 
 Required env vars
 
-**HOSTED_ZONE_ID** - the route53 hosted zone id that contains the dns record to watch for failover
-
-**DNS_NAME** - the dns name within the hosted zone to watch for failover
-
-**GLOBAL_DATASTORE_ID** - ID of the Global Elasticache Datastore
+|Var|Description|
+|---|---|
+|HOSTED_ZONE_ID|the route53 hosted zone id that contains the dns record to watch for failover|
+|DNS_NAME|the dns name within the hosted zone to watch for failover|
+|GLOBAL_DATASTORE_ID|ID of the Global Elasticache Datastore|
 
 ### Design
 
@@ -16,13 +16,13 @@ The lambda should be deployed to each region that has a datastore member.  Globa
 
 Each lambda will attempt to modify the current primary member only if the supplied DNS name resolves to a resource in the same region as the lambda, and that member is not the current primary.
 
-The lambda is configured with a DNS name it should check for changes.  Recordsets for the DNS name are cached in global memory along with the region of each aliased target.  Data store members are also stored in global memory.
+The lambda is configured with a DNS name it should check for changes; this DNS name must be in Route53 and contain alias targets to AWS resources like NLB / ALB.  
 
-**Global memory cache refresh**
+**Caching to reduce AWS API calls**
 
-To prevent rate limits of the AWS api, the recordsets and data store members are only updated in two cases after the lambda starts:
+The AWS APIs for describing the Route53 recordset and Elasticache members are rate limited to 5 requests per second.  Results of these APIs are cached in global lambda memory and only refreshed if the DNS answer for the watched domain contains IPs that are not in the cached API results.  The results are also refreshed after a failover event.
 
-* the IP addresss returned from a DNS query for the supplied domain do not match either target from the failover recordset
-* the primary or secondary member of the global data store cannot be found
+On lambda, startup the results are cached once.  Subsequent invocations only check the DNS answer of the watched domain name using a stanard DNS query.
 
-Global memory is safe to be used in this way; once initialized, the lamba code will only be executed in serial.
+### Deployment
+

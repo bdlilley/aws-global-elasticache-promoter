@@ -4,6 +4,8 @@ TLDR: deploy the lambda to each region of a 2-region Global Elasticache datastor
 
 Global Elasticache datastores support 2 regions, but only in active/passive mode.  Only one region can be read/write at one time, the other region is read-only. AWS provides no way to automatically promote a secondary region. This lambda was created to support a [Gloo Platform Multi-Region HA Demo in AWS](https://github.com/bdlilley/multi-region-demo/); the demo repo contains Terraform artifacts to deploy a 2-region, 4-cluster Gloo Platform service mesh and demonstrate automated failover Gloo Platform and AWS Global Elasticache during a simulated regional failure.
 
+![diagram](./diagram.png)
+
 ### Design
 
 On lambda initialization (only happens once per lambda instance the first time it's invoked):
